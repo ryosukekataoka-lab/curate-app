@@ -29,13 +29,6 @@
       --shadow:       0 2px 10px rgba(139,92,62,.08);
       --shadow-hover: 0 6px 22px rgba(139,92,62,.16);
 
-      --c-ai:        #7c4dcc;
-      --c-marke:     #0891b2;
-      --c-short:     #e11d48;
-      --c-jiko:      #059669;
-      --c-keiei:     #d97706;
-      --c-leader:    #2563eb;
-      --c-health:    #db2777;
     }
 
     body {
@@ -85,20 +78,6 @@
     #refreshBtn.spinning svg { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Filter bar ── */
-    .filter-bar {
-      padding: 10px 20px; display: flex; gap: 7px; flex-wrap: wrap;
-      border-bottom: 1px solid var(--border); background: var(--surface);
-      overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .cat-btn {
-      border: 1px solid var(--border); background: transparent;
-      color: var(--text2); border-radius: 20px; padding: 5px 13px;
-      font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: all .15s;
-      white-space: nowrap; font-family: inherit; flex-shrink: 0;
-    }
-    .cat-btn:hover  { border-color: var(--accent); color: var(--accent); }
-    .cat-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
     /* ── Main ── */
     main { padding: 20px; max-width: 1440px; margin: 0 auto; }
@@ -171,10 +150,6 @@
     /* ボディ */
     .card-body { padding: 12px 14px 10px; flex: 1; display: flex; flex-direction: column; gap: 7px; }
     .card-meta  { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-    .cat-tag {
-      font-size: 0.67rem; font-weight: 700; padding: 2px 8px;
-      border-radius: 4px; color: #fff; letter-spacing: .2px; flex-shrink: 0;
-    }
     .source { font-size: 0.71rem; color: var(--text2); }
     .card-title {
       font-size: 0.88rem; font-weight: 600; line-height: 1.55; color: var(--text);
@@ -350,7 +325,6 @@
     /* ── Mobile tweaks ── */
     @media (max-width: 500px) {
       header { padding: 10px 14px; }
-      .filter-bar { padding: 8px 14px; }
       main { padding: 14px; }
       #countdown { display: none; }
       .card-title { font-size: 0.92rem; }
@@ -381,22 +355,13 @@
     </div>
   </header>
 
-  <div class="filter-bar">
-    <button class="cat-btn active" onclick="filterCat('all',this)">すべて</button>
-    <button class="cat-btn" onclick="filterCat('AI',this)">AI</button>
-    <button class="cat-btn" onclick="filterCat('マーケ',this)">マーケ</button>
-    <button class="cat-btn" onclick="filterCat('ショート動画',this)">ショート動画</button>
-    <button class="cat-btn" onclick="filterCat('自己投資',this)">自己投資</button>
-    <button class="cat-btn" onclick="filterCat('経営・起業',this)">経営・起業</button>
-    <button class="cat-btn" onclick="filterCat('リーダー思考',this)">リーダー思考</button>
-    <button class="cat-btn" onclick="filterCat('健康・美容',this)">健康・美容</button>
-  </div>
 
   <main>
     <div id="errorMsg"></div>
     <div id="loadingOverlay">
       <div class="spinner"></div>
-      <div style="font-size:.83rem;color:var(--text2)">フィードを取得中… <span id="progressLabel">0 / 15</span></div>
+      <div id="warmupStatus" style="display:none;font-size:.83rem;color:var(--text2)">サーバー起動中...</div>
+      <div id="feedLoadingStatus" style="font-size:.83rem;color:var(--text2)">フィードを取得中… <span id="progressLabel">0 / 15</span></div>
       <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
     </div>
     <div id="grid"></div>
@@ -474,15 +439,6 @@ const FEEDS = [
   { category: '健康・美容',   source: 'Melos',             url: 'https://melos.media/feed/' },
 ];
 
-const CAT_COLORS = {
-  'AI':         '#7c4dcc',
-  'マーケ':      '#0891b2',
-  'ショート動画': '#e11d48',
-  '自己投資':    '#059669',
-  '経営・起業':  '#d97706',
-  'リーダー思考': '#2563eb',
-  '健康・美容':  '#db2777',
-};
 
 // ═══════════════════════════════════════
 //  STATE
@@ -711,22 +667,13 @@ async function refresh() {
 function renderArticles(cat) {
   const grid     = document.getElementById('grid');
   const emptyMsg = document.getElementById('emptyMsg');
-  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-  const base = cat === 'all' ? allArticles : allArticles.filter(a => a.category === cat);
-  const list = base.filter(a => a.pubDate > twoDaysAgo);
+  const list     = cat === 'all' ? allArticles : allArticles.filter(a => a.category === cat);
 
-  if (!list.length) {
-    grid.innerHTML = '';
-    emptyMsg.textContent = base.length ? '最近の記事はありません（2日以内の記事がありません）' : 'このカテゴリーの記事は今回のキュレーションに含まれていません。';
-    emptyMsg.classList.add('show');
-    return;
-  }
+  if (!list.length) { grid.innerHTML = ''; emptyMsg.classList.add('show'); return; }
   emptyMsg.classList.remove('show');
 
   grid.innerHTML = list.map((a, i) => {
     const idx   = allArticles.indexOf(a);
-    const color = CAT_COLORS[a.category] || '#666';
-
     // 画像エリア
     const imgHtml = a.imageUrl
       ? `<img class="card-img" src="${esc(a.imageUrl)}" alt="" loading="lazy"
@@ -747,7 +694,6 @@ function renderArticles(cat) {
         ${imgHtml}${placeholder}
         <div class="card-body">
           <div class="card-meta">
-            <span class="cat-tag" style="background:${color}">${a.category}</span>
             <span class="source">${esc(a.source)}</span>
           </div>
           <div class="card-title">${esc(a.title)}</div>
@@ -818,12 +764,6 @@ async function fetchSummary(title, desc, url, key) {
 // ═══════════════════════════════════════
 //  FILTER
 // ═══════════════════════════════════════
-function filterCat(cat, btn) {
-  currentCat = cat;
-  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderArticles(cat);
-}
 
 // ═══════════════════════════════════════
 //  CHAT VIEW
@@ -1031,11 +971,45 @@ function fmtDate(d) {
 }
 
 // ═══════════════════════════════════════
+//  WARMUP
+// ═══════════════════════════════════════
+async function warmupProxy() {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 5000;
+  const overlay      = document.getElementById('loadingOverlay');
+  const warmupEl     = document.getElementById('warmupStatus');
+  const feedEl       = document.getElementById('feedLoadingStatus');
+  const progressWrap = document.querySelector('.progress-wrap');
+
+  overlay.classList.add('show');
+  warmupEl.style.display  = '';
+  feedEl.style.display    = 'none';
+  progressWrap.style.display = 'none';
+  warmupEl.textContent    = 'サーバー起動中...';
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(PROXY, { signal: AbortSignal.timeout(8000) });
+      if (res.ok || res.status < 500) break;
+    } catch (_) {}
+    if (attempt < MAX_RETRIES) {
+      warmupEl.textContent = `サーバー起動中... (${attempt}/${MAX_RETRIES})`;
+      await new Promise(r => setTimeout(r, RETRY_DELAY));
+    }
+  }
+
+  warmupEl.style.display     = 'none';
+  feedEl.style.display       = '';
+  progressWrap.style.display = '';
+  overlay.classList.remove('show');
+}
+
+// ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
 summaryCache = loadSummaryCache();
 updateAiBadge();
-refresh();
+warmupProxy().then(() => refresh());
 </script>
 </body>
 </html>
