@@ -396,7 +396,8 @@
     <div id="errorMsg"></div>
     <div id="loadingOverlay">
       <div class="spinner"></div>
-      <div style="font-size:.83rem;color:var(--text2)">フィードを取得中… <span id="progressLabel">0 / 15</span></div>
+      <div id="warmupStatus" style="display:none;font-size:.83rem;color:var(--text2)">サーバー起動中...</div>
+      <div id="feedLoadingStatus" style="font-size:.83rem;color:var(--text2)">フィードを取得中… <span id="progressLabel">0 / 15</span></div>
       <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
     </div>
     <div id="grid"></div>
@@ -1024,11 +1025,45 @@ function fmtDate(d) {
 }
 
 // ═══════════════════════════════════════
+//  WARMUP
+// ═══════════════════════════════════════
+async function warmupProxy() {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 5000;
+  const overlay      = document.getElementById('loadingOverlay');
+  const warmupEl     = document.getElementById('warmupStatus');
+  const feedEl       = document.getElementById('feedLoadingStatus');
+  const progressWrap = document.querySelector('.progress-wrap');
+
+  overlay.classList.add('show');
+  warmupEl.style.display  = '';
+  feedEl.style.display    = 'none';
+  progressWrap.style.display = 'none';
+  warmupEl.textContent    = 'サーバー起動中...';
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(PROXY, { signal: AbortSignal.timeout(8000) });
+      if (res.ok || res.status < 500) break;
+    } catch (_) {}
+    if (attempt < MAX_RETRIES) {
+      warmupEl.textContent = `サーバー起動中... (${attempt}/${MAX_RETRIES})`;
+      await new Promise(r => setTimeout(r, RETRY_DELAY));
+    }
+  }
+
+  warmupEl.style.display     = 'none';
+  feedEl.style.display       = '';
+  progressWrap.style.display = '';
+  overlay.classList.remove('show');
+}
+
+// ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
 summaryCache = loadSummaryCache();
 updateAiBadge();
-refresh();
+warmupProxy().then(() => refresh());
 </script>
 </body>
 </html>
