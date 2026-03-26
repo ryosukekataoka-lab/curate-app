@@ -85,20 +85,6 @@
     #refreshBtn.spinning svg { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Filter bar ── */
-    .filter-bar {
-      padding: 10px 20px; display: flex; gap: 7px; flex-wrap: wrap;
-      border-bottom: 1px solid var(--border); background: var(--surface);
-      overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .cat-btn {
-      border: 1px solid var(--border); background: transparent;
-      color: var(--text2); border-radius: 20px; padding: 5px 13px;
-      font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: all .15s;
-      white-space: nowrap; font-family: inherit; flex-shrink: 0;
-    }
-    .cat-btn:hover  { border-color: var(--accent); color: var(--accent); }
-    .cat-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
     /* ── Main ── */
     main { padding: 20px; max-width: 1440px; margin: 0 auto; }
@@ -171,10 +157,6 @@
     /* ボディ */
     .card-body { padding: 12px 14px 10px; flex: 1; display: flex; flex-direction: column; gap: 7px; }
     .card-meta  { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-    .cat-tag {
-      font-size: 0.67rem; font-weight: 700; padding: 2px 8px;
-      border-radius: 4px; color: #fff; letter-spacing: .2px; flex-shrink: 0;
-    }
     .source { font-size: 0.71rem; color: var(--text2); }
     .card-title {
       font-size: 0.88rem; font-weight: 600; line-height: 1.55; color: var(--text);
@@ -350,7 +332,6 @@
     /* ── Mobile tweaks ── */
     @media (max-width: 500px) {
       header { padding: 10px 14px; }
-      .filter-bar { padding: 8px 14px; }
       main { padding: 14px; }
       #countdown { display: none; }
       .card-title { font-size: 0.92rem; }
@@ -381,16 +362,6 @@
     </div>
   </header>
 
-  <div class="filter-bar">
-    <button class="cat-btn active" onclick="filterCat('all',this)">すべて</button>
-    <button class="cat-btn" onclick="filterCat('AI',this)">AI</button>
-    <button class="cat-btn" onclick="filterCat('マーケ',this)">マーケ</button>
-    <button class="cat-btn" onclick="filterCat('ショート動画',this)">ショート動画</button>
-    <button class="cat-btn" onclick="filterCat('自己投資',this)">自己投資</button>
-    <button class="cat-btn" onclick="filterCat('経営・起業',this)">経営・起業</button>
-    <button class="cat-btn" onclick="filterCat('リーダー思考',this)">リーダー思考</button>
-    <button class="cat-btn" onclick="filterCat('健康・美容',this)">健康・美容</button>
-  </div>
 
   <main>
     <div id="errorMsg"></div>
@@ -474,15 +445,6 @@ const FEEDS = [
   { category: '健康・美容',   source: 'Melos',             url: 'https://melos.media/feed/' },
 ];
 
-const CAT_COLORS = {
-  'AI':         '#7c4dcc',
-  'マーケ':      '#0891b2',
-  'ショート動画': '#e11d48',
-  '自己投資':    '#059669',
-  '経営・起業':  '#d97706',
-  'リーダー思考': '#2563eb',
-  '健康・美容':  '#db2777',
-};
 
 // ═══════════════════════════════════════
 //  STATE
@@ -725,8 +687,6 @@ function renderArticles(cat) {
 
   grid.innerHTML = list.map((a, i) => {
     const idx   = allArticles.indexOf(a);
-    const color = CAT_COLORS[a.category] || '#666';
-
     // 画像エリア
     const imgHtml = a.imageUrl
       ? `<img class="card-img" src="${esc(a.imageUrl)}" alt="" loading="lazy"
@@ -747,7 +707,6 @@ function renderArticles(cat) {
         ${imgHtml}${placeholder}
         <div class="card-body">
           <div class="card-meta">
-            <span class="cat-tag" style="background:${color}">${a.category}</span>
             <span class="source">${esc(a.source)}</span>
           </div>
           <div class="card-title">${esc(a.title)}</div>
@@ -815,15 +774,6 @@ async function fetchSummary(title, desc, url, key) {
   return d.content?.[0]?.text?.trim() || '';
 }
 
-// ═══════════════════════════════════════
-//  FILTER
-// ═══════════════════════════════════════
-function filterCat(cat, btn) {
-  currentCat = cat;
-  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderArticles(cat);
-}
 
 // ═══════════════════════════════════════
 //  CHAT VIEW
