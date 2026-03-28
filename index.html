@@ -416,7 +416,7 @@
 const PROXY          = 'https://curate-rss-proxy.onrender.com/rss-proxy';
 const CLAUDE_API     = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL   = 'claude-sonnet-4-20250514';
-const TOTAL          = 20;
+const TOTAL          = 40;
 const INTERVAL_MS    = 60 * 60 * 1000;
 
 // ── 動作確認済みフィード（プロキシ経由200 OK） ──
@@ -465,6 +465,19 @@ function loadSummaryCache() {
 }
 function saveSummaryCache() {
   try { localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(summaryCache)); } catch {}
+}
+
+// ── localStorage articles cache helpers ──
+const ARTICLES_CACHE_KEY = 'curate_articles_cache';
+function loadArticlesCache() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
+    if (!raw) return null;
+    return raw.map(a => ({ ...a, pubDate: new Date(a.pubDate) }));
+  } catch { return null; }
+}
+function saveArticlesCache(articles) {
+  try { localStorage.setItem(ARTICLES_CACHE_KEY, JSON.stringify(articles)); } catch {}
 }
 
 // ═══════════════════════════════════════
@@ -572,13 +585,17 @@ const tx = (el, tag) => el.querySelector(tag)?.textContent?.trim() || '';
 async function fetchFeed(feed, retry=1) {
   const url = `${PROXY}?url=${encodeURIComponent(feed.url)}`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return parseRSS(await res.text(), feed);
   } catch(e) {
-    if (retry > 0) { await sleep(1500); return fetchFeed(feed, retry-1); }
+    if (retry > 0) { await sleep(500); return fetchFeed(feed, retry-1); }
     throw e;
   }
+}
+
+async function warmUpProxy() {
+  try { await fetch(`${PROXY}?url=${encodeURIComponent(FEEDS[0].url)}`, { signal: AbortSignal.timeout(5000) }); } catch {}
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -607,26 +624,34 @@ function balancedPick(byCategory, total) {
 // ═══════════════════════════════════════
 //  REFRESH
 // ═══════════════════════════════════════
-async function refresh() {
+async function refresh(silent = false) {
   const btn  = document.getElementById('refreshBtn');
   const load = document.getElementById('loadingOverlay');
   const grid = document.getElementById('grid');
   const err  = document.getElementById('errorMsg');
 
   btn.disabled = true; btn.classList.add('spinning');
-  load.classList.add('show'); grid.innerHTML = '';
   err.classList.remove('show');
-  document.getElementById('emptyMsg').classList.remove('show');
-  document.getElementById('progressLabel').textContent = `0 / ${FEEDS.length}`;
-  document.getElementById('progressBar').style.width = '0%';
+  if (!silent) {
+    load.classList.add('show'); grid.innerHTML = '';
+    document.getElementById('emptyMsg').classList.remove('show');
+    document.getElementById('progressLabel').textContent = `0 / ${FEEDS.length}`;
+    document.getElementById('progressBar').style.width = '0%';
+  }
+
+  // プロキシをウォームアップしてからフィードを並列取得
+  const warmUp = warmUpProxy();
 
   let done = 0;
   const tick = () => {
     done++;
-    document.getElementById('progressLabel').textContent = `${done} / ${FEEDS.length}`;
-    document.getElementById('progressBar').style.width = `${done/FEEDS.length*100}%`;
+    if (!silent) {
+      document.getElementById('progressLabel').textContent = `${done} / ${FEEDS.length}`;
+      document.getElementById('progressBar').style.width = `${done/FEEDS.length*100}%`;
+    }
   };
 
+  await warmUp;
   const results = await Promise.allSettled(
     FEEDS.map(f => fetchFeed(f).then(a => { tick(); return {f,a,ok:true}; })
                                .catch(e => { tick(); console.warn(f.source, e.message); return {f,a:[],ok:false}; }))
@@ -649,11 +674,15 @@ async function refresh() {
     byCategory[cat] = byCategory[cat].filter(a => { if(seen.has(a.title)) return false; seen.add(a.title); return true; });
   });
 
-  allArticles = balancedPick(byCategory, TOTAL);
+  const fresh = balancedPick(byCategory, TOTAL);
+  if (fresh.length) {
+    allArticles = fresh;
+    saveArticlesCache(allArticles);
+  }
 
   load.classList.remove('show'); btn.disabled = false; btn.classList.remove('spinning');
 
-  if (errors.length) {
+  if (errors.length && !silent) {
     err.textContent = `⚠️ 取得できなかったフィード: ${errors.join(', ')}`;
     err.classList.add('show');
   }
@@ -985,7 +1014,17 @@ function fmtDate(d) {
 // ═══════════════════════════════════════
 summaryCache = loadSummaryCache();
 updateAiBadge();
-refresh();
+
+// キャッシュがあれば即表示してバックグラウンドで更新、なければ通常ロード
+const _cached = loadArticlesCache();
+if (_cached && _cached.length) {
+  allArticles = _cached;
+  document.getElementById('articleCount').innerHTML = `<b>${allArticles.length}</b> 件`;
+  renderArticles(currentCat);
+  refresh(true);
+} else {
+  refresh();
+}
 </script>
 </body>
 </html>
