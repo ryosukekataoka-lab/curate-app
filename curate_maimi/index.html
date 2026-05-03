@@ -579,9 +579,6 @@ async function fetchFeed(feed, retry=1) {
     throw e;
   }
 }
-async function warmUpProxy() {
-  try { await fetch(`${PROXY}?url=${encodeURIComponent(FEEDS[0].url)}`, { signal: AbortSignal.timeout(5000) }); } catch {}
-}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ═══════════════════════════════════════
@@ -624,7 +621,7 @@ async function refresh(silent = false) {
     document.getElementById('progressBar').style.width = '0%';
   }
 
-  const warmUp = warmUpProxy();
+  // Cloudflare Workers はコールドスタートなし → ウォームアップ不要、即並列取得
   let done = 0;
   const tick = () => {
     done++;
@@ -634,7 +631,6 @@ async function refresh(silent = false) {
     }
   };
 
-  await warmUp;
   const results = await Promise.allSettled(
     FEEDS.map(f => fetchFeed(f).then(a => { tick(); return {f,a,ok:true}; })
                                .catch(e => { tick(); console.warn(f.source, e.message); return {f,a:[],ok:false}; }))
