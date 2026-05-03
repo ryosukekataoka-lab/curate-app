@@ -687,6 +687,8 @@ function renderArticles(cat) {
   const base = cat === 'all' ? allArticles : allArticles.filter(a => a.category === cat);
   const list = base.filter(a => a.pubDate > twoDaysAgo);
 
+  document.getElementById('articleCount').innerHTML = `<b>${list.length}</b> 件`;
+
   if (!list.length) {
     grid.innerHTML = '';
     emptyMsg.textContent = base.length
