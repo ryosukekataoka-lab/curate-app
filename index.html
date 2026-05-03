@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Curate — あなたのニュースキュレーター</title>
+  <title>Curate ryosuke — あなたのニュースキュレーター</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#8b5c3e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Curate">
+  <meta name="apple-mobile-web-app-title" content="Curate ryosuke">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -344,7 +344,7 @@
 <!-- ════════════════ LIST VIEW ════════════════ -->
 <div id="listView">
   <header>
-    <span class="logo">Cu<span>rate</span></span>
+    <span class="logo">Cu<span>rate</span><small style="font-size:0.7rem;font-weight:500;color:var(--text2);margin-left:4px">ryosuke</small></span>
     <div class="header-right">
       <span id="articleCount"></span>
       <span id="countdown"></span>
@@ -413,7 +413,7 @@
 // ═══════════════════════════════════════
 //  CONSTANTS
 // ═══════════════════════════════════════
-const PROXY          = 'https://curate-rss-proxy.onrender.com/rss-proxy';
+const PROXY          = 'https://curate-rss-proxy.ryosuke-curate.workers.dev/rss-proxy';
 const CLAUDE_API     = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL   = 'claude-sonnet-4-20250514';
 const TOTAL          = 40;
@@ -459,7 +459,7 @@ let chatHistory   = [];
 let chatArticle   = null;
 
 // ── localStorage summary cache helpers ──
-const SUMMARY_CACHE_KEY = 'curate_summary_cache';
+const SUMMARY_CACHE_KEY = 'curate_ryosuke_summary_cache';
 function loadSummaryCache() {
   try { return JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) || '{}'); } catch { return {}; }
 }
@@ -468,7 +468,7 @@ function saveSummaryCache() {
 }
 
 // ── localStorage articles cache helpers ──
-const ARTICLES_CACHE_KEY = 'curate_articles_cache';
+const ARTICLES_CACHE_KEY = 'curate_ryosuke_articles_cache';
 function loadArticlesCache() {
   try {
     const raw = JSON.parse(localStorage.getItem(ARTICLES_CACHE_KEY) || 'null');
@@ -483,7 +483,7 @@ function saveArticlesCache(articles) {
 // ═══════════════════════════════════════
 //  API KEY
 // ═══════════════════════════════════════
-const getApiKey = () => localStorage.getItem('claude_api_key') || '';
+const getApiKey = () => localStorage.getItem('claude_api_key_ryosuke') || '';
 
 function updateAiBadge() {
   const badge = document.getElementById('aiBadge');
@@ -505,13 +505,13 @@ function closeModalOutside(e) { if (e.target.id === 'modalOverlay') closeApiModa
 function saveApiKey() {
   const val = document.getElementById('apiKeyInput').value.trim();
   if (!val) { alert('APIキーを入力してください。'); return; }
-  localStorage.setItem('claude_api_key', val);
+  localStorage.setItem('claude_api_key_ryosuke', val);
   closeApiModal();
   updateAiBadge();
   if (allArticles.length) renderArticles(currentCat);
 }
 function clearApiKey() {
-  localStorage.removeItem('claude_api_key');
+  localStorage.removeItem('claude_api_key_ryosuke');
   summaryCache = {};
   localStorage.removeItem(SUMMARY_CACHE_KEY);
   closeApiModal();
@@ -594,9 +594,6 @@ async function fetchFeed(feed, retry=1) {
   }
 }
 
-async function warmUpProxy() {
-  try { await fetch(`${PROXY}?url=${encodeURIComponent(FEEDS[0].url)}`, { signal: AbortSignal.timeout(5000) }); } catch {}
-}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ═══════════════════════════════════════
@@ -639,9 +636,7 @@ async function refresh(silent = false) {
     document.getElementById('progressBar').style.width = '0%';
   }
 
-  // プロキシをウォームアップしてからフィードを並列取得
-  const warmUp = warmUpProxy();
-
+  // Cloudflare Workers はコールドスタートなし → ウォームアップ不要、即並列取得
   let done = 0;
   const tick = () => {
     done++;
@@ -651,7 +646,6 @@ async function refresh(silent = false) {
     }
   };
 
-  await warmUp;
   const results = await Promise.allSettled(
     FEEDS.map(f => fetchFeed(f).then(a => { tick(); return {f,a,ok:true}; })
                                .catch(e => { tick(); console.warn(f.source, e.message); return {f,a:[],ok:false}; }))
